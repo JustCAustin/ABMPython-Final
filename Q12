@@ -1,0 +1,117 @@
+class Product:
+    def __init__(self, product_id, name, price, category):
+        self.product_id = product_id
+        self.name       = name
+        self.price      = price
+        self.category   = category
+
+    def __repr__(self):
+        return f"Product({self.name!r}, ${self.price:.2f})"
+
+
+class DiscountStrategy:
+    """Base discount strategy."""
+    def apply(self, subtotal):  return 0.0
+
+class RegularDiscount(DiscountStrategy):
+    def apply(self, subtotal):  return subtotal * 0.05    # 5%
+
+class PremiumDiscount(DiscountStrategy):
+    def apply(self, subtotal):  return subtotal * 0.15   # 15%
+
+class VIPDiscount(DiscountStrategy):
+    def apply(self, subtotal):  return subtotal * 0.25   # 25%
+
+
+class ShoppingCart:
+    TAX_RATE = 0.05
+
+    def __init__(self):
+        self._items = {}    # product_id → [Product, qty]
+
+    def add_product(self, product, qty=1):
+        if product.product_id in self._items:
+            self._items[product.product_id][1] += qty
+        else:
+            self._items[product.product_id] = [product, qty]
+        print(f"  Added {qty}× {product.name} to cart.")
+
+    def remove_product(self, product_id):
+        if product_id in self._items:
+            name = self._items.pop(product_id)[0].name
+            print(f"  Removed '{name}' from cart.")
+        else:
+            print("  Product not in cart.")
+
+    def update_quantity(self, product_id, qty):
+        if product_id in self._items:
+            self._items[product_id][1] = qty
+            print(f"  Updated quantity to {qty}.")
+        else:
+            print("  Product not in cart.")
+
+    def subtotal(self):
+        return sum(p.price * q for p, q in self._items.values())
+
+    def generate_summary(self, discount_strategy: DiscountStrategy):
+        sub      = self.subtotal()
+        discount = discount_strategy.apply(sub)
+        tax      = (sub - discount) * self.TAX_RATE
+        total    = sub - discount + tax
+
+        print(f"\n  {'─'*45}")
+        print(f"  ORDER SUMMARY")
+        print(f"  {'─'*45}")
+        for prod, qty in self._items.values():
+            print(f"  {prod.name:<30} {qty}× ${prod.price:.2f}")
+        print(f"  {'─'*45}")
+        print(f"  Subtotal  : ${sub:>8.2f}")
+        print(f"  Discount  : -${discount:>7.2f}  ({discount_strategy.__class__.__name__})")
+        print(f"  Tax (5%)  : ${tax:>8.2f}")
+        print(f"  {'─'*45}")
+        print(f"  TOTAL     : ${total:>8.2f}")
+        print(f"  {'─'*45}\n")
+        return total
+
+
+class ECustomer:
+    TYPE_DISCOUNT = {
+        "Regular": RegularDiscount(),
+        "Premium": PremiumDiscount(),
+        "VIP":     VIPDiscount(),
+    }
+
+    def __init__(self, customer_id, name, customer_type="Regular"):
+        self.customer_id   = customer_id
+        self.name          = name
+        self.customer_type = customer_type
+        self.cart          = ShoppingCart()
+        self._orders       = []
+
+    def checkout(self):
+        strategy = self.TYPE_DISCOUNT.get(self.customer_type, DiscountStrategy())
+        total    = self.cart.generate_summary(strategy)
+        self._orders.append({"total": total, "date": datetime.now().strftime("%Y-%m-%d")})
+        self.cart = ShoppingCart()   # reset cart
+        return total
+
+
+# ── Demo ──────────────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    print("\n\n" + "="*55)
+    print("  E-COMMERCE SHOPPING CART")
+    print("="*55)
+
+    p1 = Product("P01", "Laptop",   999.99, "Electronics")
+    p2 = Product("P02", "Mouse",     29.99, "Accessories")
+    p3 = Product("P03", "Keyboard",  79.99, "Accessories")
+
+    customer = ECustomer("C001", "Alice", customer_type="VIP")
+
+    customer.cart.add_product(p1, 1)
+    customer.cart.add_product(p2, 2)
+    customer.cart.add_product(p3, 1)
+    customer.cart.remove_product("P02")
+    customer.cart.update_quantity("P03", 2)
+
+    customer.checkout()

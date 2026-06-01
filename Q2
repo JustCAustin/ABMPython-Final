@@ -1,0 +1,126 @@
+class ImmutableMeta(type):
+    """Metaclass that enforces immutability after __init__ completes."""
+    def __call__(cls, *args, **kwargs):
+        instance = cls.__new__(cls)
+        # Allow setting attributes during __init__
+        object.__setattr__(instance, '_initialized', False)
+        instance.__init__(*args, **kwargs)
+        # Lock the object
+        object.__setattr__(instance, '_initialized', True)
+        return instance
+
+
+class Transaction(metaclass=ImmutableMeta):
+    """
+    Immutable transaction object.
+    Once created, no attribute can be modified, added, or deleted.
+    """
+
+    def __init__(self, transaction_id, amount, currency, sender, receiver, timestamp):
+        self.transaction_id = transaction_id
+        self.amount = amount
+        self.currency = currency
+        self.sender = sender
+        self.receiver = receiver
+        self.timestamp = timestamp
+
+    def __setattr__(self, name, value):
+        if object.__getattribute__(self, '_initialized'):
+            raise AttributeError(
+                f"Transaction is immutable. Cannot modify attribute '{name}'."
+            )
+        object.__setattr__(self, name, value)
+
+    def __delattr__(self, name):
+        if object.__getattribute__(self, '_initialized'):
+            raise AttributeError(
+                f"Transaction is immutable. Cannot delete attribute '{name}'."
+            )
+        object.__delattr__(self, name)
+
+    def __repr__(self):
+        return (
+            f"Transaction(id={self.transaction_id!r}, amount={self.amount}, "
+            f"currency={self.currency!r}, sender={self.sender!r}, "
+            f"receiver={self.receiver!r}, timestamp={self.timestamp!r})"
+        )
+
+    def __str__(self):
+        return (
+            f"--- Transaction Receipt ---\n"
+            f"  ID       : {self.transaction_id}\n"
+            f"  Amount   : {self.amount} {self.currency}\n"
+            f"  From     : {self.sender}\n"
+            f"  To       : {self.receiver}\n"
+            f"  Date/Time: {self.timestamp}\n"
+            f"--------------------------"
+        )
+
+    def __eq__(self, other):
+        if not isinstance(other, Transaction):
+            return NotImplemented
+        return self.transaction_id == other.transaction_id
+
+    def __hash__(self):
+        return hash(self.transaction_id)
+
+
+# Subclass — immutability must still hold
+class InternationalTransaction(Transaction):
+    def __init__(self, transaction_id, amount, currency,
+                 sender, receiver, timestamp, exchange_rate):
+        super().__init__(transaction_id, amount, currency,
+                         sender, receiver, timestamp)
+        self.exchange_rate = exchange_rate
+
+    def __str__(self):
+        base = super().__str__()
+        return base.replace(
+            "--------------------------",
+            f"  Exchange : {self.exchange_rate}\n--------------------------"
+        )
+
+
+# ── Demo ──────────────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    t = Transaction(
+        transaction_id="TXN-001",
+        amount=1500.00,
+        currency="CAD",
+        sender="Alice",
+        receiver="Bob",
+        timestamp="2025-01-10 09:30:00"
+    )
+
+    print(t)
+    print(repr(t))
+
+    # Attempt modification
+    print("\n--- Immutability Tests ---")
+    try:
+        t.amount = 9999
+    except AttributeError as e:
+        print(f"Modify test  : {e}")
+
+    try:
+        del t.sender
+    except AttributeError as e:
+        print(f"Delete test  : {e}")
+
+    try:
+        t.new_field = "hacked"
+    except AttributeError as e:
+        print(f"Add test     : {e}")
+
+    # Subclass test
+    print("\n--- International Transaction ---")
+    it = InternationalTransaction(
+        "TXN-002", 2000, "USD", "Charlie", "Diana",
+        "2025-01-11 10:00:00", exchange_rate=1.36
+    )
+    print(it)
+
+    try:
+        it.exchange_rate = 1.99
+    except AttributeError as e:
+        print(f"Subclass immutability: {e}")

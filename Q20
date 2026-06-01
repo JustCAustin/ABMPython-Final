@@ -1,0 +1,219 @@
+CSV20 = """ProductID,ProductName,Category,StoreCity,StockReceived,StockSold,UnitCost,UnitPrice,RestockDate,ExpiryDays
+P001,Rice 5kg,Grocery,Calgary,500,420,12,18,2025-01-05,180
+P002,Milk 1L,Dairy,Edmonton,300,280,2,4,2025-01-06,7
+P003,Bread,Bakery,Calgary,400,390,1.5,3,2025-01-07,3
+P004,Chicken 1kg,Meat,Red Deer,200,180,6,10,2025-01-08,5
+P005,Apples,Fruits,Calgary,350,300,3,6,2025-01-09,10
+P006,Banana,Fruits,Edmonton,450,400,2.5,5,2025-01-10,7
+P007,Soap,Household,Calgary,600,500,1,2.5,2025-01-11,365
+P008,Shampoo,Household,Red Deer,250,200,4,8,2025-01-12,720
+P009,Cheese,Dairy,Calgary,180,150,5,9,2025-01-13,20
+P010,Eggs 12pc,Dairy,Edmonton,320,310,3,5,2025-01-14,14"""
+
+print("\n\n" + "=" * 65)
+print("QUESTION 20: SUPERMARKET INVENTORY & SALES ANALYSIS")
+print("=" * 65)
+
+import io
+import pandas as pd
+import matplotlib.pyplot as plt
+
+OUTPUT = '/mnt/user-data/outputs'
+
+
+df20 = pd.read_csv(io.StringIO(CSV20))
+df20['RestockDate'] = pd.to_datetime(df20['RestockDate'])
+
+# Task 1 — Load & inspect
+print("\nFirst 5 rows:")
+print(df20.head().to_string(index=False))
+print("\nData Types:")
+print(df20.dtypes)
+print(f"\nMissing values: {df20.isnull().sum().sum()}")
+
+# Task 2 — Inventory & Sales columns
+df20['RemainingStock']  = df20['StockReceived'] - df20['StockSold']
+df20['Revenue']         = df20['StockSold'] * df20['UnitPrice']
+df20['CostPriceTotal']  = df20['StockSold'] * df20['UnitCost']
+df20['Profit']          = df20['Revenue'] - df20['CostPriceTotal']
+
+print(f"\nMost profitable product  : {df20.loc[df20['Profit'].idxmax(), 'ProductName']} "
+      f"(${df20['Profit'].max():,.2f})")
+print(f"Least profitable product : {df20.loc[df20['Profit'].idxmin(), 'ProductName']} "
+      f"(${df20['Profit'].min():,.2f})")
+print(f"Total Profit             : ${df20['Profit'].sum():,.2f}")
+
+# Task 3 — Stock Efficiency
+df20['StockEfficiency'] = (df20['StockSold'] / df20['StockReceived']).round(3)
+print(f"\nMost efficient product   : {df20.loc[df20['StockEfficiency'].idxmax(), 'ProductName']} "
+      f"({df20['StockEfficiency'].max()*100:.1f}%)")
+print(f"Least efficient product  : {df20.loc[df20['StockEfficiency'].idxmin(), 'ProductName']} "
+      f"({df20['StockEfficiency'].min()*100:.1f}%)")
+print("\nProducts with >80% stock sold:")
+print(df20[df20['StockEfficiency'] > 0.80][['ProductName', 'StockEfficiency']].to_string(index=False))
+print("\nProducts with <50% stock sold:")
+under50 = df20[df20['StockEfficiency'] < 0.50][['ProductName', 'StockEfficiency']]
+print(under50.to_string(index=False) if not under50.empty else "  None")
+
+# Task 4 — City Performance
+city_grp = df20.groupby('StoreCity').agg(
+    Revenue=('Revenue', 'sum'),
+    Profit=('Profit', 'sum'),
+    StockSold=('StockSold', 'sum'),
+    UnsoldStock=('RemainingStock', 'sum')
+)
+print(f"\nCity Performance:")
+print(city_grp.to_string())
+print(f"Best city (profit)       : {city_grp['Profit'].idxmax()}")
+print(f"City with highest waste  : {city_grp['UnsoldStock'].idxmax()}")
+
+fig, ax = plt.subplots(figsize=(7, 4))
+city_grp['Profit'].plot(kind='bar', ax=ax, color='mediumseagreen', edgecolor='black')
+ax.set_title("Profit by City")
+ax.set_xlabel("City")
+ax.set_ylabel("Profit ($)")
+ax.tick_params(axis='x', rotation=0)
+plt.tight_layout()
+plt.savefig(f"{OUTPUT}/q20_city_profit.png", dpi=100)
+plt.close()
+
+# Task 5 — Category Analysis
+cat_grp = df20.groupby('Category').agg(
+    Revenue=('Revenue', 'sum'),
+    Profit=('Profit', 'sum'),
+    AvgUnitPrice=('UnitPrice', 'mean')
+).round(2)
+print("\nCategory Analysis:")
+print(cat_grp.to_string())
+
+fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+cat_grp['Revenue'].plot(kind='pie', ax=axes[0], autopct='%1.1f%%', startangle=90)
+axes[0].set_title("Revenue by Category")
+axes[0].set_ylabel("")
+
+cat_grp['Profit'].plot(kind='bar', ax=axes[1], color='coral', edgecolor='black')
+axes[1].set_title("Profit by Category")
+axes[1].set_xlabel("Category")
+axes[1].set_ylabel("Profit ($)")
+axes[1].tick_params(axis='x', rotation=30)
+plt.tight_layout()
+plt.savefig(f"{OUTPUT}/q20_category.png", dpi=100)
+plt.close()
+
+# Task 6 — Expiry Risk
+high_risk = df20[df20['ExpiryDays'] < 10]
+risk_value = (high_risk['RemainingStock'] * high_risk['UnitCost']).sum()
+print(f"\nHigh-risk items (ExpiryDays < 10):")
+print(high_risk[['ProductName', 'Category', 'ExpiryDays', 'RemainingStock']].to_string(index=False))
+print(f"Total value of high-risk inventory : ${risk_value:,.2f}")
+print(f"Most affected category             : {high_risk['Category'].value_counts().idxmax()}")
+
+# Task 7 — Business Intelligence
+profit_margin = (df20['Profit'] / df20['Revenue']).round(3)
+print(f"\nHighest profit margin product  : {df20.loc[profit_margin.idxmax(), 'ProductName']} "
+      f"({profit_margin.max()*100:.1f}%)")
+print(f"Category to expand             : {cat_grp['Profit'].idxmax()}")
+city_demand = df20.groupby('StoreCity')['StockSold'].sum()
+city_stock  = df20.groupby('StoreCity')['RemainingStock'].sum()
+print(f"City with high demand but low remaining stock: "
+      f"{(city_demand / (city_demand + city_stock)).idxmax()}")
+overstock = df20[(df20['RemainingStock'] > 80) & (df20['StockEfficiency'] < 0.85)]
+print(f"Overstocked & low demand products: "
+      f"{list(overstock['ProductName'])}")
+
+# Task 8 — Visualizations
+fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+fig.suptitle("Supermarket Inventory & Sales Dashboard", fontsize=14, fontweight='bold')
+
+# Profit by product
+df20.set_index('ProductName')['Profit'].plot(kind='bar', ax=axes[0,0],
+                                               color='steelblue', edgecolor='black')
+axes[0,0].set_title("Profit by Product")
+axes[0,0].tick_params(axis='x', rotation=45)
+axes[0,0].set_ylabel("Profit ($)")
+
+# Revenue by category pie
+cat_grp['Revenue'].plot(kind='pie', ax=axes[0,1], autopct='%1.1f%%', startangle=90)
+axes[0,1].set_title("Revenue by Category")
+axes[0,1].set_ylabel("")
+
+# Stock Sold vs Received
+x = range(len(df20))
+axes[1,0].plot(x, df20['StockReceived'], marker='o', label='Received', color='steelblue')
+axes[1,0].plot(x, df20['StockSold'],     marker='s', label='Sold',     color='coral')
+axes[1,0].set_xticks(x)
+axes[1,0].set_xticklabels(df20['ProductName'], rotation=45, ha='right', fontsize=8)
+axes[1,0].set_title("Stock Sold vs Received")
+axes[1,0].set_ylabel("Units")
+axes[1,0].legend()
+
+# Correlation heatmap
+try:
+    import seaborn as sns
+    num_cols = ['StockReceived','StockSold','UnitCost','UnitPrice',
+                'Revenue','Profit','RemainingStock','StockEfficiency']
+    corr20 = df20[num_cols].corr()
+    sns.heatmap(corr20, annot=True, fmt='.1f', cmap='YlOrRd', ax=axes[1,1], annot_kws={"size":7})
+    axes[1,1].set_title("Correlation Heatmap")
+except ImportError:
+    axes[1,1].text(0.5, 0.5, "Seaborn not available", ha='center', va='center')
+
+plt.tight_layout()
+plt.savefig(f"{OUTPUT}/q20_dashboard.png", dpi=100)
+plt.close()
+print("\nDashboard saved: q20_dashboard.png")
+
+# Task 9 — Final Business Report
+print(f"""
+{'='*65}
+SUPERMARKET FINAL BUSINESS REPORT
+{'='*65}
+  Total Revenue                : ${df20['Revenue'].sum():,.2f}
+  Total Profit                 : ${df20['Profit'].sum():,.2f}
+
+  Top 3 Products (by profit):
+{df20.nlargest(3,'Profit')[['ProductName','Profit']].to_string(index=False)}
+
+  Risky (near-expiry) Products:
+{high_risk[['ProductName','ExpiryDays','RemainingStock']].to_string(index=False)}
+
+  Recommendations:
+  1. INVENTORY OPTIMIZATION: Reduce bread and chicken restock quantities —
+     they have very short expiry windows and unsold stock becomes waste.
+  2. PROFIT IMPROVEMENT: Household products (Soap, Shampoo) carry strong
+     margins. Expanding this category with new SKUs would lift overall
+     profitability.
+  3. WASTE REDUCTION: Implement markdown promotions for items within
+     7 days of expiry to clear stock and recover cost rather than
+     discarding it.
+{'='*65}
+""")
+
+# Bonus — Discount clearance simulation
+df20_bonus = df20.copy()
+df20_bonus['NewRevenue'] = df20_bonus['Revenue'].copy()
+mask_rem   = df20_bonus['RemainingStock'] > 100
+mask_exp   = df20_bonus['ExpiryDays'] < 5
+# Apply discounts to remaining stock that would otherwise go unsold
+df20_bonus.loc[mask_rem, 'NewRevenue'] += df20_bonus.loc[mask_rem, 'RemainingStock'] * \
+    df20_bonus.loc[mask_rem, 'UnitPrice'] * 0.80   # 20% discount on remaining
+df20_bonus.loc[mask_exp, 'NewRevenue'] += df20_bonus.loc[mask_exp, 'RemainingStock'] * \
+    df20_bonus.loc[mask_exp, 'UnitPrice'] * 0.60   # 40% discount on expiring
+
+orig_profit = df20['Profit'].sum()
+new_profit  = (df20_bonus['NewRevenue'] - df20_bonus['CostPriceTotal']).sum()
+print(f"BONUS — Original Profit: ${orig_profit:,.2f}  |  After Clearance: ${new_profit:,.2f}")
+
+fig, ax = plt.subplots(figsize=(7, 4))
+ax.bar(['Original Profit', 'After Clearance'], [orig_profit, new_profit],
+       color=['steelblue', 'mediumseagreen'], edgecolor='black')
+ax.set_title("Original vs Clearance-Discount Profit")
+ax.set_ylabel("Profit ($)")
+for i, v in enumerate([orig_profit, new_profit]):
+    ax.text(i, v + 20, f"${v:,.0f}", ha='center', fontweight='bold')
+plt.tight_layout()
+plt.savefig(f"{OUTPUT}/q20_discount_comparison.png", dpi=100)
+plt.close()
+print("Clearance comparison saved: q20_discount_comparison.png")
+
+print("\nAll charts saved to /mnt/user-data/outputs/")

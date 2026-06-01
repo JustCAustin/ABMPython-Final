@@ -1,0 +1,187 @@
+from datetime import datetime
+
+
+class MenuItem:
+    """Represents a single item on a restaurant menu."""
+
+    def __init__(self, name, price, category="Main"):
+        self.name     = name
+        self.price    = price
+        self.category = category
+
+    def __repr__(self):
+        return f"MenuItem({self.name!r}, ${self.price:.2f})"
+
+
+class Restaurant:
+    """Represents a restaurant with a menu."""
+
+    def __init__(self, name, cuisine, delivery_fee=5.0):
+        self.name         = name
+        self.cuisine      = cuisine
+        self.delivery_fee = delivery_fee
+        self.menu         = {}   # name → MenuItem
+
+    def add_item(self, item: MenuItem):
+        self.menu[item.name] = item
+
+    def get_item(self, name):
+        item = self.menu.get(name)
+        if not item:
+            raise ValueError(f"'{name}' is not on the menu at {self.name}.")
+        return item
+
+    def display_menu(self):
+        print(f"\n  ── {self.name} Menu ──")
+        for item in self.menu.values():
+            print(f"    {item.name:<25} ${item.price:>6.2f}  [{item.category}]")
+        print(f"    Delivery fee: ${self.delivery_fee:.2f}")
+
+    def __repr__(self):
+        return f"Restaurant({self.name!r}, cuisine={self.cuisine!r})"
+
+
+class Coupon:
+    """Discount coupon."""
+
+    def __init__(self, code, discount_pct):
+        self.code         = code
+        self.discount_pct = discount_pct   # e.g. 10 means 10 %
+
+    def apply(self, amount):
+        return round(amount * (1 - self.discount_pct / 100), 2)
+
+    def __repr__(self):
+        return f"Coupon({self.code!r}, {self.discount_pct}%)"
+
+
+class Order:
+    """Represents a single order from one restaurant."""
+
+    _counter = 1
+
+    def __init__(self, customer, restaurant):
+        self.order_id    = f"ORD-{Order._counter:04d}"
+        Order._counter  += 1
+        self.customer    = customer
+        self.restaurant  = restaurant
+        self.items       = []    # list of (MenuItem, qty)
+        self.coupon      = None
+        self.timestamp   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.is_placed   = False
+
+    def add_item(self, item_name, qty=1):
+        item = self.restaurant.get_item(item_name)
+        self.items.append((item, qty))
+        print(f"  Added {qty}× {item.name} (${item.price:.2f} each)")
+
+    def apply_coupon(self, coupon: Coupon):
+        self.coupon = coupon
+        print(f"  Coupon '{coupon.code}' ({coupon.discount_pct}% off) applied.")
+
+    def subtotal(self):
+        return sum(item.price * qty for item, qty in self.items)
+
+    def delivery_fee(self):
+        return self.restaurant.delivery_fee
+
+    def discount_amount(self, subtotal):
+        if self.coupon:
+            return round(subtotal * self.coupon.discount_pct / 100, 2)
+        return 0.0
+
+    def total(self):
+        sub      = self.subtotal()
+        discount = self.discount_amount(sub)
+        return sub - discount + self.delivery_fee()
+
+    def generate_invoice(self):
+        sub      = self.subtotal()
+        discount = self.discount_amount(sub)
+        total    = sub - discount + self.delivery_fee()
+
+        print(f"\n{'='*50}")
+        print(f"  INVOICE  {self.order_id}")
+        print(f"  Date    : {self.timestamp}")
+        print(f"  Customer: {self.customer.name}")
+        print(f"  From    : {self.restaurant.name}")
+        print(f"{'─'*50}")
+        for item, qty in self.items:
+            print(f"  {item.name:<25} {qty}× ${item.price:>6.2f}  = ${item.price*qty:>7.2f}")
+        print(f"{'─'*50}")
+        print(f"  {'Subtotal':<35} ${sub:>7.2f}")
+        if self.coupon:
+            print(f"  {'Coupon ('+self.coupon.code+', -'+str(self.coupon.discount_pct)+'%)':<35} -${discount:>6.2f}")
+        print(f"  {'Delivery Fee':<35} ${self.delivery_fee():>7.2f}")
+        print(f"{'─'*50}")
+        print(f"  {'TOTAL':<35} ${total:>7.2f}")
+        print(f"{'='*50}\n")
+        return total
+
+
+class Customer:
+    """Represents a customer who can order from multiple restaurants."""
+
+    def __init__(self, name, email):
+        self.name   = name
+        self.email  = email
+        self.orders = []
+
+    def place_order(self, restaurant):
+        order = Order(self, restaurant)
+        self.orders.append(order)
+        print(f"\n  Order {order.order_id} created for {self.name} at {restaurant.name}")
+        return order
+
+    def order_history(self):
+        print(f"\n=== Order History for {self.name} ===")
+        if not self.orders:
+            print("  No orders placed yet.")
+        for o in self.orders:
+            print(f"  {o.order_id}  |  {o.restaurant.name:<20}  |  Total: ${o.total():.2f}")
+
+    def __repr__(self):
+        return f"Customer({self.name!r})"
+
+
+# ── Demo ──────────────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    # Build restaurants
+    pizza_place = Restaurant("Mario's Pizza", "Italian", delivery_fee=3.99)
+    pizza_place.add_item(MenuItem("Margherita Pizza", 14.99, "Pizza"))
+    pizza_place.add_item(MenuItem("Pepperoni Pizza",  16.99, "Pizza"))
+    pizza_place.add_item(MenuItem("Caesar Salad",      8.99, "Salad"))
+    pizza_place.add_item(MenuItem("Garlic Bread",      4.99, "Side"))
+
+    sushi_place = Restaurant("Tokyo Bites", "Japanese", delivery_fee=4.99)
+    sushi_place.add_item(MenuItem("Salmon Roll",      12.99, "Sushi"))
+    sushi_place.add_item(MenuItem("Tempura",          13.99, "Main"))
+    sushi_place.add_item(MenuItem("Miso Soup",         3.99, "Soup"))
+
+    pizza_place.display_menu()
+    sushi_place.display_menu()
+
+    # Create coupons
+    save10 = Coupon("SAVE10", 10)
+    vip20  = Coupon("VIP20",  20)
+
+    # Customer orders
+    customer = Customer("Alice", "alice@email.com")
+
+    # Order 1
+    print("\n=== Placing Order 1 (Mario's Pizza) ===")
+    order1 = customer.place_order(pizza_place)
+    order1.add_item("Margherita Pizza", 1)
+    order1.add_item("Garlic Bread",     2)
+    order1.apply_coupon(save10)
+    order1.generate_invoice()
+
+    # Order 2
+    print("=== Placing Order 2 (Tokyo Bites) ===")
+    order2 = customer.place_order(sushi_place)
+    order2.add_item("Salmon Roll", 2)
+    order2.add_item("Miso Soup",   1)
+    order2.apply_coupon(vip20)
+    order2.generate_invoice()
+
+    customer.order_history()

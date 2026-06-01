@@ -1,0 +1,121 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')
+import io, os
+
+OUTPUT = "/mnt/user-data/outputs"
+os.makedirs(OUTPUT, exist_ok=True)
+
+CSV18 = """PatientID,Name,Age,Gender,Department,DaysAdmitted,TreatmentCost,InsuranceCoverage
+P001,John Smith,45,Male,Cardiology,5,8500,5000
+P002,Sarah Lee,31,Female,Neurology,7,12000,7000
+P003,Mike Brown,58,Male,Orthopedics,10,9500,4000
+P004,Emma Davis,27,Female,Pediatrics,3,3000,1500
+P005,Chris Wilson,62,Male,Cardiology,8,14000,8000
+P006,Lisa Taylor,39,Female,Neurology,6,10000,6000
+P007,Kevin White,50,Male,Orthopedics,4,6500,2500
+P008,Nancy Hall,35,Female,Pediatrics,2,2500,1000
+P009,Tom Clark,71,Male,Cardiology,12,18000,10000
+P010,Susan Green,29,Female,Neurology,5,8500,5000"""
+
+df18 = pd.read_csv(io.StringIO(CSV18))
+
+print("=" * 65)
+print("QUESTION 18: HOSPITAL PATIENT ANALYTICS")
+print("=" * 65)
+
+# Task 2 — PatientPayment
+df18['PatientPayment'] = df18['TreatmentCost'] - df18['InsuranceCoverage']
+print("\nPatientPayment column added:")
+print(df18[['Name', 'TreatmentCost', 'InsuranceCoverage', 'PatientPayment']].to_string(index=False))
+
+# Task 3 — Key metrics
+print(f"\nTotal Hospital Revenue       : ${df18['TreatmentCost'].sum():,.2f}")
+print(f"Average Treatment Cost       : ${df18['TreatmentCost'].mean():,.2f}")
+print(f"Average Insurance Coverage   : ${df18['InsuranceCoverage'].mean():,.2f}")
+
+# Task 4 — Department stats
+dept_rev  = df18.groupby('Department')['TreatmentCost'].sum()
+dept_stay = df18.groupby('Department')['DaysAdmitted'].mean()
+print(f"\nDept with highest revenue    : {dept_rev.idxmax()} (${dept_rev.max():,.2f})")
+print(f"Dept with longest avg stay   : {dept_stay.idxmax()} ({dept_stay.max():.1f} days)")
+
+# Task 5 — Charts
+fig, axes = plt.subplots(1, 3, figsize=(16, 5))
+fig.suptitle("Hospital Patient Analytics Dashboard", fontsize=14, fontweight='bold')
+
+dept_rev.plot(kind='bar', ax=axes[0], color='steelblue', edgecolor='black')
+axes[0].set_title("Revenue by Department")
+axes[0].set_xlabel("Department")
+axes[0].set_ylabel("Revenue ($)")
+axes[0].tick_params(axis='x', rotation=30)
+
+dept_count = df18['Department'].value_counts()
+axes[1].pie(dept_count, labels=dept_count.index, autopct='%1.1f%%', startangle=90)
+axes[1].set_title("Patients by Department")
+
+axes[2].scatter(df18['Age'], df18['TreatmentCost'], color='coral', s=80, edgecolors='black')
+axes[2].set_title("Age vs Treatment Cost")
+axes[2].set_xlabel("Age")
+axes[2].set_ylabel("Treatment Cost ($)")
+m, b = np.polyfit(df18['Age'], df18['TreatmentCost'], 1)
+x_line = np.linspace(df18['Age'].min(), df18['Age'].max(), 50)
+axes[2].plot(x_line, m*x_line + b, 'r--', label='Trend')
+axes[2].legend()
+
+plt.tight_layout()
+plt.savefig(f"{OUTPUT}/q18_hospital.png", dpi=100)
+plt.close()
+print("\nTask 5 — Chart saved: q18_hospital.png")
+
+# Task 6 — Extreme patients
+print(f"\nHighest treatment cost  : "
+      f"{df18.loc[df18['TreatmentCost'].idxmax(), 'Name']} "
+      f"(${df18['TreatmentCost'].max():,.2f})")
+print(f"Longest hospital stay   : "
+      f"{df18.loc[df18['DaysAdmitted'].idxmax(), 'Name']} "
+      f"({df18['DaysAdmitted'].max()} days)")
+
+# Task 7 — Age groups
+def age_group_18(age):
+    if age <= 40: return "20–40"
+    elif age <= 60: return "41–60"
+    else: return "61+"
+
+df18['AgeGroup'] = df18['Age'].apply(age_group_18)
+print("\nAvg Treatment Cost by Age Group:")
+print(df18.groupby('AgeGroup')['TreatmentCost'].mean().round(2).to_string())
+
+# Task 8 — Avg payment by dept
+print("\nAvg Patient Payment by Department:")
+print(df18.groupby('Department')['PatientPayment'].mean().round(2).to_string())
+
+# Task 9 — Healthcare analytics report
+print(f"""
+{'='*65}
+HEALTHCARE ANALYTICS REPORT — 5 Recommendations
+{'='*65}
+  1. EXPAND CARDIOLOGY RESOURCES: Cardiology generates the highest
+     revenue (${dept_rev.get('Cardiology', 0):,.0f}) and has the longest average stays.
+     Investing in specialist staff and beds here maximises returns.
+
+  2. OFFER TIERED INSURANCE PACKAGES: Average patient out-of-pocket cost
+     is ${df18['PatientPayment'].mean():,.0f}. Partnering with more insurers or offering
+     hospital-funded payment plans reduces financial burden and
+     improves patient satisfaction.
+
+  3. ELDERLY PATIENTS (61+) INCUR THE HIGHEST COSTS: Patients over 60
+     have significantly higher treatment costs. Creating dedicated geriatric
+     wards with specialised equipment can improve outcomes and efficiency.
+
+  4. SHORTEN AVERAGE LENGTH OF STAY: Long admissions tie up beds and
+     resources. Early discharge programs and home-care follow-ups could
+     free capacity for more patients.
+
+  5. PEDIATRICS IS COST-EFFICIENT: Pediatric cases cost less and have the
+     shortest stays. Promoting pediatric preventive care and vaccination
+     programmes can lower future hospitalisation demand.
+{'='*65}
+""")

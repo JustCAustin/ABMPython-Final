@@ -1,0 +1,147 @@
+from datetime import datetime
+
+
+class ParkingVehicle:
+    """Base class for parked vehicles."""
+
+    RATE_PER_HOUR = 0    # override in subclass
+
+    def __init__(self, plate_number):
+        self.plate_number = plate_number
+
+    @classmethod
+    def rate(cls):
+        return cls.RATE_PER_HOUR
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.plate_number!r})"
+
+
+class ParkingCar(ParkingVehicle):   RATE_PER_HOUR = 5.0
+class ParkingBike(ParkingVehicle):  RATE_PER_HOUR = 2.0
+class ParkingTruck(ParkingVehicle): RATE_PER_HOUR = 10.0
+
+
+class ParkingSpot:
+    def __init__(self, spot_id, vehicle_type):
+        self.spot_id      = spot_id
+        self.vehicle_type = vehicle_type  # "Car", "Bike", "Truck"
+        self._vehicle     = None
+        self._entry_time  = None
+
+    @property
+    def is_free(self):  return self._vehicle is None
+
+    def park(self, vehicle):
+        if not self.is_free:
+            raise ValueError(f"Spot {self.spot_id} is occupied.")
+        self._vehicle    = vehicle
+        self._entry_time = datetime.now()
+        print(f"  {vehicle} parked at spot {self.spot_id} @ {self._entry_time.strftime('%H:%M:%S')}")
+
+    def vacate(self):
+        if self.is_free:
+            raise ValueError(f"Spot {self.spot_id} is already empty.")
+        vehicle    = self._vehicle
+        entry      = self._entry_time
+        exit_time  = datetime.now()
+        hours      = max(1, round((exit_time - entry).seconds / 3600, 2))
+        fee        = vehicle.rate() * hours
+
+        self._vehicle    = None
+        self._entry_time = None
+        print(f"  {vehicle} left spot {self.spot_id}. "
+              f"Duration: {hours}h  Fee: ${fee:.2f}")
+        return fee
+
+    def __repr__(self):
+        status = "FREE" if self.is_free else f"OCCUPIED by {self._vehicle}"
+        return f"Spot({self.spot_id!r}, {self.vehicle_type}, {status})"
+
+
+class ParkingLot:
+    def __init__(self, name):
+        self.name        = name
+        self._spots      = []
+        self._daily_revenue = 0.0
+
+    @staticmethod
+    def vehicle_class(vehicle_type):
+        return {"Car": ParkingCar, "Bike": ParkingBike, "Truck": ParkingTruck}[vehicle_type]
+
+    def add_spot(self, spot_id, vehicle_type):
+        self._spots.append(ParkingSpot(spot_id, vehicle_type))
+
+    def find_spot(self, vehicle_type):
+        for spot in self._spots:
+            if spot.vehicle_type == vehicle_type and spot.is_free:
+                return spot
+        return None
+
+    def park_vehicle(self, plate_number, vehicle_type):
+        spot = self.find_spot(vehicle_type)
+        if not spot:
+            print(f"  No available {vehicle_type} spots.")
+            return None
+        cls     = self.vehicle_class(vehicle_type)
+        vehicle = cls(plate_number)
+        spot.park(vehicle)
+        return spot
+
+    def exit_vehicle(self, spot_id):
+        for spot in self._spots:
+            if spot.spot_id == spot_id:
+                fee = spot.vacate()
+                self._daily_revenue += fee
+                return fee
+        print(f"  Spot {spot_id} not found.")
+        return 0.0
+
+    def available_spots(self):
+        print(f"\n  Available Spots in {self.name}:")
+        for vtype in ["Car", "Bike", "Truck"]:
+            free = sum(1 for s in self._spots if s.vehicle_type == vtype and s.is_free)
+            total = sum(1 for s in self._spots if s.vehicle_type == vtype)
+            print(f"    {vtype:<6}: {free}/{total} available")
+
+    @classmethod
+    def daily_rate_info(cls):
+        print(f"  Rates — Car: ${ParkingCar.RATE_PER_HOUR}/hr  "
+              f"Bike: ${ParkingBike.RATE_PER_HOUR}/hr  "
+              f"Truck: ${ParkingTruck.RATE_PER_HOUR}/hr")
+
+    def revenue_report(self):
+        print(f"\n  ── Daily Revenue Report: {self.name} ──")
+        print(f"     Date   : {datetime.now().strftime('%Y-%m-%d')}")
+        print(f"     Revenue: ${self._daily_revenue:,.2f}")
+
+
+# ── Demo ──────────────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    print("\n\n" + "="*55)
+    print("  SMART PARKING MANAGEMENT SYSTEM")
+    print("="*55)
+
+    lot = ParkingLot("Downtown Parking")
+
+    # Add spots
+    for i in range(1, 4): lot.add_spot(f"C{i}", "Car")
+    for i in range(1, 3): lot.add_spot(f"B{i}", "Bike")
+    lot.add_spot("T1", "Truck")
+
+    ParkingLot.daily_rate_info()
+    lot.available_spots()
+
+    print()
+    lot.park_vehicle("ABC-123", "Car")
+    lot.park_vehicle("XYZ-789", "Bike")
+    lot.park_vehicle("TRK-001", "Truck")
+
+    lot.available_spots()
+
+    print()
+    lot.exit_vehicle("C1")
+    lot.exit_vehicle("B1")
+    lot.exit_vehicle("T1")
+
+    lot.revenue_report()

@@ -1,0 +1,102 @@
+class AccountMeta(type):
+    """Metaclass that automatically registers all account types."""
+    _registry = {}
+
+    def __new__(mcs, name, bases, namespace):
+        cls = super().__new__(mcs, name, bases, namespace)
+        # Skip registering the base class itself
+        if bases:
+            if name in mcs._registry:
+                raise ValueError(f"Account type '{name}' is already registered.")
+            mcs._registry[name] = cls
+        return cls
+
+    @classmethod
+    def display_all(mcs):
+        """Display all registered account types."""
+        if not mcs._registry:
+            print("No account types registered.")
+        else:
+            print("Registered Account Types:")
+            for name in mcs._registry:
+                print(f"  - {name}")
+
+    @classmethod
+    def create_account(mcs, class_name, *args, **kwargs):
+        """Dynamically create an account using only the class name."""
+        if class_name not in mcs._registry:
+            raise ValueError(f"Account type '{class_name}' not found in registry.")
+        return mcs._registry[class_name](*args, **kwargs)
+
+
+class BankAccount(metaclass=AccountMeta):
+    """Base class for all bank accounts."""
+    def __init__(self, owner, balance=0):
+        self.owner = owner
+        self.balance = balance
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(owner='{self.owner}', balance={self.balance})"
+
+
+class SavingsAccount(BankAccount):
+    interest_rate = 0.04
+
+    def apply_interest(self):
+        self.balance += self.balance * self.interest_rate
+        print(f"Interest applied. New balance: {self.balance:.2f}")
+
+
+class CurrentAccount(BankAccount):
+    overdraft_limit = 500
+
+    def withdraw(self, amount):
+        if self.balance - amount < -self.overdraft_limit:
+            print("Overdraft limit exceeded.")
+        else:
+            self.balance -= amount
+            print(f"Withdrew {amount}. Balance: {self.balance}")
+
+
+class LoanAccount(BankAccount):
+    def __init__(self, owner, loan_amount, interest_rate=0.08):
+        super().__init__(owner, -loan_amount)
+        self.interest_rate = interest_rate
+
+    def pay_installment(self, amount):
+        self.balance += amount
+        print(f"Installment paid. Remaining balance: {self.balance:.2f}")
+
+
+# ── Demo ──────────────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    # Display all registered account types
+    AccountMeta.display_all()
+
+    # Dynamically create accounts using only the class name
+    acc1 = AccountMeta.create_account("SavingsAccount", "Alice", 1000)
+    acc2 = AccountMeta.create_account("CurrentAccount", "Bob", 500)
+    acc3 = AccountMeta.create_account("LoanAccount", "Charlie", 5000)
+
+    print("\nCreated Accounts:")
+    print(acc1)
+    print(acc2)
+    print(acc3)
+
+    # Test functionality
+    print("\n--- Savings Account ---")
+    acc1.apply_interest()
+
+    print("\n--- Current Account ---")
+    acc2.withdraw(900)   # Uses overdraft
+
+    print("\n--- Loan Account ---")
+    acc3.pay_installment(500)
+
+    # Test duplicate prevention
+    print("\n--- Duplicate Registration Test ---")
+    try:
+        class SavingsAccount(BankAccount):  # noqa: F811
+            pass
+    except ValueError as e:
+        print(f"Error: {e}")

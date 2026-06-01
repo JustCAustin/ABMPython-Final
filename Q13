@@ -1,0 +1,106 @@
+import random
+
+class Character:
+    def __init__(self, name, health, attack_power, defense):
+        self.name         = name
+        self._health      = health
+        self._max_health  = health
+        self._attack_power = attack_power
+        self._defense     = defense
+
+    @property
+    def health(self):      return self._health
+    @property
+    def is_alive(self):    return self._health > 0
+
+    def take_damage(self, damage):
+        actual = max(0, damage - self._defense)
+        self._health = max(0, self._health - actual)
+        return actual
+
+    def attack(self, target):
+        raise NotImplementedError
+
+    def status(self):
+        bar_len = 20
+        filled  = int(bar_len * self._health / self._max_health)
+        bar     = "█" * filled + "░" * (bar_len - filled)
+        return (f"  {self.name:<12} [{bar}] "
+                f"{self._health}/{self._max_health} HP")
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.name!r}, HP={self._health})"
+
+
+class Warrior(Character):
+    """High defense, heavy melee attack."""
+    def __init__(self, name):
+        super().__init__(name, health=150, attack_power=35, defense=15)
+
+    def attack(self, target):
+        damage  = self._attack_power + random.randint(0, 10)
+        actual  = target.take_damage(damage)
+        print(f"  ⚔  {self.name} swings sword at {target.name} "
+              f"for {damage} dmg → {actual} actual (def absorbed {damage-actual})")
+        return actual
+
+
+class Mage(Character):
+    """Low defense, high magic burst damage."""
+    def __init__(self, name):
+        super().__init__(name, health=100, attack_power=55, defense=5)
+
+    def attack(self, target):
+        damage  = self._attack_power + random.randint(-5, 20)
+        actual  = target.take_damage(damage)
+        print(f"  🔮 {self.name} casts fireball at {target.name} "
+              f"for {damage} dmg → {actual} actual")
+        return actual
+
+
+class Archer(Character):
+    """Medium stats, double-shot ability."""
+    def __init__(self, name):
+        super().__init__(name, health=120, attack_power=28, defense=8)
+
+    def attack(self, target):
+        total_actual = 0
+        for shot in range(1, 3):
+            damage = self._attack_power + random.randint(0, 8)
+            actual = target.take_damage(damage)
+            total_actual += actual
+            print(f"  🏹 {self.name} shoots arrow #{shot} at {target.name} "
+                  f"for {damage} → {actual} actual")
+        return total_actual
+
+
+def simulate_battle(c1: Character, c2: Character):
+    print(f"\n{'='*55}")
+    print(f"  ⚔  BATTLE: {c1.name} ({c1.__class__.__name__}) "
+          f"vs {c2.name} ({c2.__class__.__name__})")
+    print(f"{'='*55}")
+    round_num = 1
+    while c1.is_alive and c2.is_alive:
+        print(f"\n  ── Round {round_num} ──")
+        c1.attack(c2)
+        if c2.is_alive:
+            c2.attack(c1)
+        print(c1.status())
+        print(c2.status())
+        round_num += 1
+
+    winner = c1 if c1.is_alive else c2
+    loser  = c2 if c1.is_alive else c1
+    print(f"\n  🏆 {winner.name} wins! {loser.name} has been defeated.")
+    print(f"{'='*55}\n")
+
+
+# ── Demo ──────────────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    random.seed(42)
+    warrior = Warrior("Thor")
+    mage    = Mage("Gandalf")
+    archer  = Archer("Legolas")
+
+    simulate_battle(warrior, mage)
+    simulate_battle(archer,  mage)

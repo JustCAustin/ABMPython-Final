@@ -1,0 +1,163 @@
+import io
+import pandas as pd
+import matplotlib.pyplot as plt
+
+OUTPUT = "."
+
+CSV19 = """TripID,DriverName,RiderName,City,VehicleType,TripDistance_km,StartTime,EndTime,Fare,SurgeMultiplier,Rating
+T001,Ali Khan,John Smith,Calgary,Sedan,12,08:15,08:45,25,1.0,4.5
+T002,Sara Ahmed,Lisa Brown,Edmonton,SUV,25,09:10,09:55,55,1.5,4.8
+T003,Mike Lee,Emma Davis,Calgary,Economy,8,10:00,10:20,18,1.0,4.2
+T004,John White,Chris Wilson,Red Deer,Sedan,30,11:00,11:50,60,2.0,4.9
+T005,Ali Khan,Nancy Hall,Calgary,SUV,15,12:10,12:40,40,1.2,4.7
+T006,Sara Ahmed,Tom Clark,Edmonton,Economy,10,13:00,13:25,20,1.0,4.0
+T007,Mike Lee,Susan Green,Lethbridge,Sedan,18,14:10,14:50,38,1.3,4.6
+T008,John White,Kevin White,Calgary,SUV,22,15:20,16:05,65,2.0,4.9
+T009,Ali Khan,David Lee,Edmonton,Economy,5,16:30,16:45,12,1.0,3.8
+T010,Sara Ahmed,Amanda Clark,Red Deer,Sedan,40,17:10,18:20,80,2.5,5.0"""
+
+print("\n\n" + "=" * 65)
+print("QUESTION 19: RIDE-SHARING TRIP ANALYSIS")
+print("=" * 65)
+
+df19 = pd.read_csv(io.StringIO(CSV19))
+
+# Task 1 — Preprocessing
+BASE_DATE = "2025-01-01 "
+df19['StartDT']      = pd.to_datetime(BASE_DATE + df19['StartTime'])
+df19['EndDT']        = pd.to_datetime(BASE_DATE + df19['EndTime'])
+df19['TripDuration'] = (df19['EndDT'] - df19['StartDT']).dt.total_seconds() / 60
+print("\nTrip durations (minutes):")
+print(df19[['TripID', 'DriverName', 'RiderName', 'TripDuration']].to_string(index=False))
+
+# Task 2 — Revenue Analysis
+df19['AdjustedFare'] = df19['Fare'] * df19['SurgeMultiplier']
+print(f"\nTotal Revenue            : ${df19['AdjustedFare'].sum():,.2f}")
+print(f"Average Fare per Trip    : ${df19['AdjustedFare'].mean():.2f}")
+print(f"Highest Earning Trip     : {df19.loc[df19['AdjustedFare'].idxmax(), 'TripID']} "
+      f"(${df19['AdjustedFare'].max():.2f})")
+rev_per_km = df19.groupby('VehicleType').apply(
+    lambda x: x['AdjustedFare'].sum() / x['TripDistance_km'].sum(), include_groups=False
+)
+print(f"Highest rev/km vehicle   : {rev_per_km.idxmax()} (${rev_per_km.max():.2f}/km)")
+
+# Task 3 — Driver Performance
+driver_trips    = df19.groupby('DriverName')['TripID'].count()
+driver_earnings = df19.groupby('DriverName')['AdjustedFare'].sum()
+driver_rating   = df19.groupby('DriverName')['Rating'].mean()
+driver_rating_std = df19.groupby('DriverName')['Rating'].std().fillna(0)
+print("\nDriver Performance:")
+drv_df = pd.DataFrame({'Trips': driver_trips, 'Earnings': driver_earnings,
+                        'AvgRating': driver_rating.round(2), 'RatingStd': driver_rating_std.round(2)})
+print(drv_df.to_string())
+print(f"\nBest performing driver   : {driver_earnings.idxmax()} (${driver_earnings.max():.2f})")
+print(f"Most consistent driver   : {driver_rating_std.idxmin()} "
+      f"(rating std={driver_rating_std.min():.2f})")
+
+# Task 4 — City-level analysis
+city_trips  = df19.groupby('City')['TripID'].count()
+city_rev    = df19.groupby('City')['AdjustedFare'].sum()
+print(f"\nMost profitable city     : {city_rev.idxmax()} (${city_rev.max():.2f})")
+print(f"Highest avg fare city    : "
+      f"{df19.groupby('City')['AdjustedFare'].mean().idxmax()}")
+
+# Stacked bar — revenue by city and vehicle type
+city_veh = df19.groupby(['City', 'VehicleType'])['AdjustedFare'].sum().unstack(fill_value=0)
+fig, ax = plt.subplots(figsize=(9, 5))
+city_veh.plot(kind='bar', stacked=True, ax=ax, colormap='Set2', edgecolor='black')
+ax.set_title("Revenue by City and Vehicle Type")
+ax.set_xlabel("City")
+ax.set_ylabel("Adjusted Fare ($)")
+ax.tick_params(axis='x', rotation=30)
+ax.legend(title='Vehicle Type', loc='upper right')
+plt.tight_layout()
+plt.savefig(f"{OUTPUT}/q19_city_vehicle_revenue.png", dpi=100)
+plt.close()
+
+# Task 5 — Time-based demand
+df19['Hour'] = df19['StartDT'].dt.hour
+trips_per_hour = df19.groupby('Hour')['TripID'].count()
+print(f"\nPeak booking hour        : {trips_per_hour.idxmax()}:00")
+print(f"Off-peak hour            : {trips_per_hour.idxmin()}:00")
+
+fig, ax = plt.subplots(figsize=(8, 4))
+trips_per_hour.plot(kind='line', marker='o', color='steelblue', ax=ax)
+ax.set_title("Trips per Hour")
+ax.set_xlabel("Hour of Day")
+ax.set_ylabel("Number of Trips")
+plt.tight_layout()
+plt.savefig(f"{OUTPUT}/q19_trips_per_hour.png", dpi=100)
+plt.close()
+
+# Task 6 — Correlation heatmap
+try:
+    import seaborn as sns
+    corr_cols = ['TripDistance_km', 'Fare', 'Rating', 'SurgeMultiplier', 'TripDuration']
+    corr = df19[corr_cols].corr()
+    fig, ax = plt.subplots(figsize=(7, 5))
+    sns.heatmap(corr, annot=True, fmt='.2f', cmap='coolwarm', ax=ax)
+    ax.set_title("Correlation Heatmap")
+    plt.tight_layout()
+    plt.savefig(f"{OUTPUT}/q19_heatmap.png", dpi=100)
+    plt.close()
+    print("\nHeatmap saved: q19_heatmap.png")
+except ImportError:
+    print("\nSeaborn not available — skipping heatmap.")
+
+print(f"\nLonger trips → better ratings? "
+      f"Corr(Distance, Rating) = {df19['TripDistance_km'].corr(df19['Rating']):.2f}")
+print(f"Surge → lower ratings? "
+      f"Corr(Surge, Rating) = {df19['SurgeMultiplier'].corr(df19['Rating']):.2f}")
+
+# Task 7 — Customer behaviour
+rider_trips = df19.groupby('RiderName')['TripID'].count()
+repeat      = rider_trips[rider_trips > 1]
+print(f"\nRepeat riders            : {list(repeat.index)}")
+rider_pay   = df19.groupby('RiderName')['AdjustedFare'].sum()
+print(f"Most frequent rider      : {rider_trips.idxmax()} ({rider_trips.max()} trips)")
+print(f"Highest paying rider     : {rider_pay.idxmax()} (${rider_pay.max():.2f})")
+
+# Task 8 — Business Report
+total_platform_rev = df19['AdjustedFare'].sum()
+print(f"""
+{'='*65}
+RIDE-SHARING BUSINESS REPORT
+{'='*65}
+  Total Platform Revenue    : ${total_platform_rev:,.2f}
+  Best Driver               : {driver_earnings.idxmax()} (${driver_earnings.max():.2f} earned)
+  Best City for Expansion   : {city_rev.idxmax()} (highest revenue already)
+  Peak Demand Time          : {trips_per_hour.idxmax()}:00
+
+  3 Recommendations:
+  1. Increase driver availability during peak hours to reduce wait times
+     and increase bookings in high-demand windows.
+  2. Introduce surge pricing caps — very high multipliers (2.5×) risk
+     lower satisfaction; capping at 2× balances revenue and rider loyalty.
+  3. Expand SUV fleet in Calgary — SUV trips generate strong revenue
+     in that market, suggesting demand for larger vehicles.
+{'='*65}
+""")
+
+# Bonus: Discount simulation
+df19_disc = df19.copy()
+df19_disc['DiscountedFare'] = df19_disc['AdjustedFare'].copy()
+mask_distance = df19_disc['TripDistance_km'] > 20
+mask_rating   = df19_disc['Rating'] >= 4.8
+df19_disc.loc[mask_distance, 'DiscountedFare'] *= 0.90
+df19_disc.loc[mask_rating,   'DiscountedFare'] *= 0.95
+
+orig_rev = df19_disc['AdjustedFare'].sum()
+disc_rev = df19_disc['DiscountedFare'].sum()
+print(f"BONUS: Original Revenue = ${orig_rev:.2f}  |  After Discounts = ${disc_rev:.2f}")
+
+fig, ax = plt.subplots(figsize=(7, 4))
+ax.bar(['Original', 'After Discount'], [orig_rev, disc_rev],
+       color=['steelblue', 'coral'], edgecolor='black')
+ax.set_title("Original vs Discounted Revenue")
+ax.set_ylabel("Revenue ($)")
+for i, v in enumerate([orig_rev, disc_rev]):
+    ax.text(i, v + 2, f"${v:.2f}", ha='center', fontweight='bold')
+plt.tight_layout()
+plt.savefig(f"{OUTPUT}/q19_discount_comparison.png", dpi=100)
+plt.close()
+print("Discount comparison chart saved: q19_discount_comparison.png")

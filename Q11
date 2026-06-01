@@ -1,0 +1,100 @@
+from datetime import datetime
+
+
+class Employee:
+    """Base employee class."""
+
+    def __init__(self, emp_id, name, department):
+        self._emp_id     = emp_id
+        self.name        = name
+        self.department  = department
+
+    def calculate_salary(self):
+        raise NotImplementedError
+
+    def payslip(self):
+        salary = self.calculate_salary()
+        print(f"\n  ── Payslip: {self.name} ({self.__class__.__name__}) ──")
+        print(f"     ID         : {self._emp_id}")
+        print(f"     Department : {self.department}")
+        print(f"     Month      : {datetime.now().strftime('%B %Y')}")
+        print(f"     Net Salary : ${salary:,.2f}")
+        return salary
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.name!r})"
+
+
+class FullTimeEmployee(Employee):
+    def __init__(self, emp_id, name, department, monthly_salary, bonus=0):
+        super().__init__(emp_id, name, department)
+        self._monthly_salary = monthly_salary
+        self._bonus          = bonus
+
+    def calculate_salary(self):
+        return self._monthly_salary + self._bonus
+
+    def payslip(self):
+        salary = super().payslip()
+        print(f"     Base Salary: ${self._monthly_salary:,.2f}")
+        print(f"     Bonus      : ${self._bonus:,.2f}")
+        return salary
+
+
+class PartTimeEmployee(Employee):
+    def __init__(self, emp_id, name, department, hourly_rate, hours_worked):
+        super().__init__(emp_id, name, department)
+        self._hourly_rate   = hourly_rate
+        self._hours_worked  = hours_worked
+
+    def calculate_salary(self):
+        return self._hourly_rate * self._hours_worked
+
+    def payslip(self):
+        salary = super().payslip()
+        print(f"     Hourly Rate: ${self._hourly_rate:.2f}")
+        print(f"     Hours      : {self._hours_worked}")
+        return salary
+
+
+class ContractEmployee(Employee):
+    def __init__(self, emp_id, name, department, contract_amount, tax_rate=0.15):
+        super().__init__(emp_id, name, department)
+        self._contract_amount = contract_amount
+        self._tax_rate        = tax_rate
+
+    def calculate_salary(self):
+        return self._contract_amount * (1 - self._tax_rate)
+
+    def payslip(self):
+        salary = super().payslip()
+        print(f"     Contract   : ${self._contract_amount:,.2f}")
+        print(f"     Tax ({int(self._tax_rate*100)}%)   : -${self._contract_amount*self._tax_rate:,.2f}")
+        return salary
+
+
+def monthly_payroll_report(employees):
+    print(f"\n{'='*55}")
+    print(f"  MONTHLY PAYROLL REPORT — {datetime.now().strftime('%B %Y')}")
+    print(f"{'='*55}")
+    total = 0.0
+    for emp in employees:
+        salary = emp.calculate_salary()
+        total += salary
+        print(f"  {emp.name:<25} {emp.__class__.__name__:<20} ${salary:>10,.2f}")
+    print(f"{'─'*55}")
+    print(f"  {'TOTAL PAYROLL':<46} ${total:>10,.2f}")
+    print(f"{'='*55}")
+
+
+# ── Demo ──────────────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    ft  = FullTimeEmployee("E001", "Alice",   "Engineering", 7000, bonus=500)
+    pt  = PartTimeEmployee("E002", "Bob",     "Marketing",   25,   hours_worked=80)
+    con = ContractEmployee("E003", "Charlie", "IT",          5000, tax_rate=0.15)
+
+    ft.payslip()
+    pt.payslip()
+    con.payslip()
+
+    monthly_payroll_report([ft, pt, con])

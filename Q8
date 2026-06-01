@@ -1,0 +1,123 @@
+class Patient:
+    def __init__(self, patient_id, name, age, gender):
+        self._patient_id   = patient_id
+        self.name          = name
+        self.age           = age
+        self.gender        = gender
+        self._appointments = []
+        self._records      = []    # MedicalRecord objects (encapsulated)
+
+    @property
+    def patient_id(self):     return self._patient_id
+
+    def add_appointment(self, appointment):
+        self._appointments.append(appointment)
+
+    def _add_record(self, record):
+        """Internal — records should only be added by Doctor."""
+        self._records.append(record)
+
+    def get_history(self):
+        print(f"\n{'='*55}")
+        print(f"  PATIENT HISTORY: {self.name} (ID: {self._patient_id})")
+        print(f"  Age: {self.age}  Gender: {self.gender}")
+        print(f"{'─'*55}")
+        print(f"  Appointments:")
+        for appt in self._appointments:
+            print(f"    {appt}")
+        print(f"  Medical Records:")
+        for rec in self._records:
+            rec.display()
+        print(f"{'='*55}")
+
+    def __repr__(self):
+        return f"Patient({self._patient_id!r}, {self.name!r})"
+
+
+class Doctor:
+    def __init__(self, doctor_id, name, specialization):
+        self._doctor_id      = doctor_id
+        self.name            = name
+        self.specialization  = specialization
+        self._patients       = set()
+
+    def treat(self, patient, diagnosis, prescription):
+        self._patients.add(patient)
+        record = MedicalRecord(patient, self, diagnosis, prescription)
+        patient._add_record(record)
+        print(f"  Dr. {self.name} treated {patient.name}: {diagnosis}")
+        return record
+
+    def __repr__(self):
+        return f"Doctor({self.name!r}, {self.specialization!r})"
+
+
+class Appointment:
+    _counter = 1
+
+    def __init__(self, patient, doctor, date_str, reason):
+        self._id     = f"APT-{Appointment._counter:03d}"
+        Appointment._counter += 1
+        self.patient = patient
+        self.doctor  = doctor
+        self.date    = date_str
+        self.reason  = reason
+        patient.add_appointment(self)
+
+    def __str__(self):
+        return (f"[{self._id}] {self.date}  "
+                f"Dr. {self.doctor.name} — {self.reason}")
+
+
+class MedicalRecord:
+    """Encapsulated: attributes are read-only after creation."""
+
+    def __init__(self, patient, doctor, diagnosis, prescription):
+        self.__patient      = patient
+        self.__doctor       = doctor
+        self.__diagnosis    = diagnosis
+        self.__prescription = prescription
+        self.__created_at   = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    # Read-only access
+    @property
+    def diagnosis(self):    return self.__diagnosis
+    @property
+    def prescription(self): return self.__prescription
+
+    def display(self):
+        print(f"    [{self.__created_at}] "
+              f"Diagnosis: {self.__diagnosis}  |  "
+              f"Rx: {self.__prescription}  |  "
+              f"Dr. {self.__doctor.name}")
+
+
+# ── Demo ──────────────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    print("\n\n" + "="*60)
+    print("  HOSPITAL MANAGEMENT SYSTEM")
+    print("="*60)
+
+    doc1 = Doctor("D001", "Adams",   "Cardiology")
+    doc2 = Doctor("D002", "Bennett", "Neurology")
+
+    p1 = Patient("P001", "John",  45, "Male")
+    p2 = Patient("P002", "Sarah", 30, "Female")
+
+    Appointment(p1, doc1, "2025-01-10", "Chest pain")
+    Appointment(p1, doc2, "2025-01-15", "Headache")
+    Appointment(p2, doc1, "2025-01-12", "Palpitations")
+
+    doc1.treat(p1, "Hypertension",      "Amlodipine 5mg")
+    doc2.treat(p1, "Migraine",          "Sumatriptan 50mg")
+    doc1.treat(p2, "Arrhythmia",        "Metoprolol 25mg")
+
+    p1.get_history()
+    p2.get_history()
+
+    # Encapsulation test — records cannot be altered directly
+    rec = p1._records[0]
+    try:
+        rec.__diagnosis = "Hacked"
+    except AttributeError as e:
+        print(f"Encapsulation holds: {e}")

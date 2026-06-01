@@ -1,0 +1,108 @@
+from datetime import datetime, timedelta
+
+
+class Vehicle:
+    """Base class for all rentable vehicles."""
+
+    def __init__(self, vehicle_id, make, model, year):
+        self._vehicle_id  = vehicle_id
+        self._make        = make
+        self._model       = model
+        self._year        = year
+        self._is_rented   = False
+        self._rental_log  = []
+
+    @property
+    def vehicle_id(self):   return self._vehicle_id
+    @property
+    def is_rented(self):    return self._is_rented
+
+    def daily_rate(self):
+        raise NotImplementedError
+
+    def late_penalty_per_day(self):
+        raise NotImplementedError
+
+    def calculate_charge(self, days_rented, days_late=0):
+        base     = self.daily_rate() * days_rented
+        penalty  = self.late_penalty_per_day() * days_late
+        return base, penalty, base + penalty
+
+    def rent(self, customer_name, planned_days):
+        if self._is_rented:
+            print(f"  {self._make} {self._model} is already rented.")
+            return None
+        self._is_rented = True
+        record = {
+            "customer": customer_name,
+            "planned_days": planned_days,
+            "start": datetime.now(),
+            "end": None,
+        }
+        self._rental_log.append(record)
+        print(f"  [{self._vehicle_id}] {self._make} {self._model} rented to "
+              f"{customer_name} for {planned_days} day(s).")
+        return record
+
+    def return_vehicle(self, actual_days):
+        if not self._is_rented:
+            print("  Vehicle is not currently rented.")
+            return
+        record = self._rental_log[-1]
+        record["end"]          = datetime.now()
+        record["actual_days"]  = actual_days
+        planned                = record["planned_days"]
+        days_late              = max(0, actual_days - planned)
+        base, penalty, total   = self.calculate_charge(actual_days, days_late)
+        self._is_rented = False
+
+        print(f"\n  --- Rental Summary [{self._vehicle_id}] ---")
+        print(f"  Vehicle   : {self._year} {self._make} {self._model}")
+        print(f"  Customer  : {record['customer']}")
+        print(f"  Planned   : {planned} day(s)")
+        print(f"  Actual    : {actual_days} day(s)")
+        print(f"  Daily Rate: ${self.daily_rate():.2f}")
+        print(f"  Base Cost : ${base:.2f}")
+        if days_late:
+            print(f"  Late Days : {days_late}  Penalty: ${penalty:.2f}")
+        print(f"  TOTAL     : ${total:.2f}")
+        return total
+
+    def __repr__(self):
+        status = "Rented" if self._is_rented else "Available"
+        return f"{self.__class__.__name__}({self._vehicle_id!r}, {self._make} {self._model}, {status})"
+
+
+class Car(Vehicle):
+    def daily_rate(self):            return 60.0
+    def late_penalty_per_day(self):  return 25.0
+
+
+class Bike(Vehicle):
+    def daily_rate(self):            return 20.0
+    def late_penalty_per_day(self):  return 8.0
+
+
+class Truck(Vehicle):
+    def __init__(self, vehicle_id, make, model, year, payload_tons):
+        super().__init__(vehicle_id, make, model, year)
+        self._payload_tons = payload_tons
+
+    def daily_rate(self):            return 100.0 + self._payload_tons * 10
+    def late_penalty_per_day(self):  return 50.0
+
+
+# ── Demo ──────────────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    car   = Car("CAR-01",   "Toyota", "Camry",      2022)
+    bike  = Bike("BIKE-01", "Honda",  "CB500",      2021)
+    truck = Truck("TRK-01", "Ford",   "F-250",      2020, payload_tons=2)
+
+    car.rent("Alice", planned_days=5)
+    bike.rent("Bob",  planned_days=3)
+    truck.rent("Carol", planned_days=7)
+
+    print()
+    car.return_vehicle(actual_days=5)    # on time
+    bike.return_vehicle(actual_days=5)   # 2 days late
+    truck.return_vehicle(actual_days=9)  # 2 days late

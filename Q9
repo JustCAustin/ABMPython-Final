@@ -1,0 +1,115 @@
+class Flight:
+    SEAT_CLASSES = {
+        "Economy":  {"multiplier": 1.0,  "seats": 100},
+        "Business": {"multiplier": 2.5,  "seats": 30},
+        "First":    {"multiplier": 5.0,  "seats": 10},
+    }
+
+    def __init__(self, flight_number, origin, destination,
+                 departure, base_price):
+        self._flight_number = flight_number
+        self.origin         = origin
+        self.destination    = destination
+        self.departure      = departure
+        self._base_price    = base_price
+        # Track booked seats per class: class → set of seat numbers
+        self._booked = {cls: set() for cls in self.SEAT_CLASSES}
+
+    def seat_price(self, seat_class):
+        return self._base_price * self.SEAT_CLASSES[seat_class]["multiplier"]
+
+    def available_seats(self, seat_class):
+        capacity = self.SEAT_CLASSES[seat_class]["seats"]
+        return capacity - len(self._booked[seat_class])
+
+    def book_seat(self, passenger, seat_class):
+        if seat_class not in self.SEAT_CLASSES:
+            raise ValueError(f"Unknown class '{seat_class}'.")
+        if self.available_seats(seat_class) == 0:
+            raise ValueError(f"No seats available in {seat_class}.")
+        seat_num = len(self._booked[seat_class]) + 1
+        seat_id  = f"{seat_class[0]}{seat_num:02d}"
+        # Check double booking
+        for s_class, seats in self._booked.items():
+            if seat_id in seats:
+                raise ValueError("Seat already booked.")
+        self._booked[seat_class].add(seat_id)
+        return seat_id
+
+    def __repr__(self):
+        return (f"Flight({self._flight_number!r}, "
+                f"{self.origin}→{self.destination}, {self.departure})")
+
+
+class Passenger:
+    def __init__(self, passport_number, name, email):
+        self.passport_number = passport_number
+        self.name            = name
+        self.email           = email
+        self._tickets        = []
+
+    def book(self, flight, seat_class):
+        seat_id = flight.book_seat(self, seat_class)
+        ticket  = Ticket(self, flight, seat_class, seat_id)
+        self._tickets.append(ticket)
+        print(f"  Booking confirmed for {self.name}: {ticket}")
+        return ticket
+
+    def __repr__(self):
+        return f"Passenger({self.name!r})"
+
+
+class Ticket:
+    _counter = 1000
+
+    def __init__(self, passenger, flight, seat_class, seat_id):
+        self.ticket_number = f"TKT-{Ticket._counter}"
+        Ticket._counter   += 1
+        self.passenger     = passenger
+        self.flight        = flight
+        self.seat_class    = seat_class
+        self.seat_id       = seat_id
+        self.price         = flight.seat_price(seat_class)
+
+    def confirmation(self):
+        f = self.flight
+        print(f"\n  ─── Booking Confirmation ───────────────")
+        print(f"  Ticket    : {self.ticket_number}")
+        print(f"  Passenger : {self.passenger.name}")
+        print(f"  Flight    : {f._flight_number}  {f.origin} → {f.destination}")
+        print(f"  Departure : {f.departure}")
+        print(f"  Class     : {self.seat_class:<10}  Seat: {self.seat_id}")
+        print(f"  Price     : ${self.price:,.2f}")
+        print(f"  ────────────────────────────────────────\n")
+
+    def __str__(self):
+        return (f"[{self.ticket_number}] "
+                f"{self.flight._flight_number} {self.seat_class} Seat {self.seat_id} "
+                f"${self.price:,.2f}")
+
+
+# ── Demo ──────────────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    print("\n\n" + "="*60)
+    print("  AIRLINE RESERVATION SYSTEM")
+    print("="*60)
+
+    flight = Flight("AC123", "Calgary", "Toronto",
+                    "2025-03-15 08:00", base_price=300.0)
+
+    p1 = Passenger("PP001", "Alice",   "alice@email.com")
+    p2 = Passenger("PP002", "Bob",     "bob@email.com")
+    p3 = Passenger("PP003", "Charlie", "charlie@email.com")
+
+    t1 = p1.book(flight, "Economy")
+    t2 = p2.book(flight, "Business")
+    t3 = p3.book(flight, "First")
+
+    t1.confirmation()
+    t2.confirmation()
+    t3.confirmation()
+
+    print(f"  Economy seats left  : {flight.available_seats('Economy')}")
+    print(f"  Business seats left : {flight.available_seats('Business')}")
+    print(f"  First Class left    : {flight.available_seats('First')}")
+

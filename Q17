@@ -1,0 +1,142 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')
+import io, os
+
+CSV_DATA = """StudentID,Name,Program,Semester,Python,Database,WebDevelopment,Networking
+S101,John,Software Development,1,78,82,75,80
+S102,Sarah,Cyber Security,2,88,79,84,91
+S103,Mike,Software Development,3,65,72,70,68
+S104,Emma,Data Analytics,1,92,88,90,85
+S105,Chris,Cyber Security,2,81,76,79,87
+S106,Lisa,Software Development,4,95,91,93,89
+S107,Kevin,Data Analytics,3,73,80,75,77
+S108,Nancy,Cyber Security,1,85,83,88,90
+S109,Tom,Software Development,2,69,74,71,73
+S110,Susan,Data Analytics,4,97,95,96,94"""
+
+OUTPUT = "/mnt/user-data/outputs"
+os.makedirs(OUTPUT, exist_ok=True)
+
+df = pd.read_csv(io.StringIO(CSV_DATA))
+SUBJECTS = ['Python', 'Database', 'WebDevelopment', 'Networking']
+
+# ── Task 1: Load ──────────────────────────────────────────────────────────────
+print("=" * 60)
+print("TASK 1: Dataset Loaded")
+print("=" * 60)
+print(df.to_string(index=False))
+
+# ── Task 2: TotalMarks, Percentage, Grade ─────────────────────────────────────
+df['TotalMarks']  = df[SUBJECTS].sum(axis=1)
+df['Percentage']  = (df['TotalMarks'] / (len(SUBJECTS) * 100)) * 100
+
+def assign_grade(pct):
+    if pct >= 90: return 'A'
+    elif pct >= 80: return 'B'
+    elif pct >= 70: return 'C'
+    elif pct >= 60: return 'D'
+    else: return 'F'
+
+df['Grade'] = df['Percentage'].apply(assign_grade)
+
+print("\n" + "=" * 60)
+print("TASK 2: TotalMarks, Percentage, Grade")
+print("=" * 60)
+print(df[['Name', 'TotalMarks', 'Percentage', 'Grade']].to_string(index=False))
+
+# ── Task 3: Highest / Lowest / Avg by Program ─────────────────────────────────
+print("\n" + "=" * 60)
+print("TASK 3: Student Findings")
+print("=" * 60)
+print(f"Highest Scoring Student : {df.loc[df['Percentage'].idxmax(), 'Name']} "
+      f"({df['Percentage'].max():.2f}%)")
+print(f"Lowest Scoring Student  : {df.loc[df['Percentage'].idxmin(), 'Name']} "
+      f"({df['Percentage'].min():.2f}%)")
+print("\nAverage Percentage by Program:")
+print(df.groupby('Program')['Percentage'].mean().round(2).to_string())
+
+# ── Task 4: Grade counts ──────────────────────────────────────────────────────
+print("\n" + "=" * 60)
+print("TASK 4: Students per Grade")
+print("=" * 60)
+print(df['Grade'].value_counts().to_string())
+
+# ── Task 5: Charts ────────────────────────────────────────────────────────────
+print("\nTASK 5: Generating charts...")
+
+fig, axes = plt.subplots(1, 3, figsize=(16, 5))
+fig.suptitle("Student Performance Analysis", fontsize=14, fontweight='bold')
+
+# Bar chart — avg marks by subject
+avg_subject = df[SUBJECTS].mean()
+avg_subject.plot(kind='bar', ax=axes[0], color='steelblue', edgecolor='black')
+axes[0].set_title("Average Marks by Subject")
+axes[0].set_xlabel("Subject")
+axes[0].set_ylabel("Average Marks")
+axes[0].tick_params(axis='x', rotation=30)
+axes[0].axhline(y=avg_subject.mean(), color='red', linestyle='--', label='Overall Avg')
+axes[0].legend()
+
+# Pie chart — grade distribution
+grade_counts = df['Grade'].value_counts()
+colors_g = {'A': 'gold', 'B': 'cornflowerblue', 'C': 'mediumseagreen', 'D': 'salmon'}
+clrs = [colors_g.get(g, 'gray') for g in grade_counts.index]
+axes[1].pie(grade_counts, labels=grade_counts.index, autopct='%1.1f%%',
+            colors=clrs, startangle=90)
+axes[1].set_title("Grade Distribution")
+
+# Box plot — percentages
+axes[2].boxplot(df['Percentage'], patch_artist=True,
+                boxprops=dict(facecolor='lightblue'))
+axes[2].set_title("Box Plot: Student Percentages")
+axes[2].set_ylabel("Percentage (%)")
+axes[2].set_xticks([1])
+axes[2].set_xticklabels(['All Students'])
+
+plt.tight_layout()
+plt.savefig(f"{OUTPUT}/q17_student_dashboard.png", dpi=100)
+plt.close()
+print("  → Saved: q17_student_dashboard.png")
+
+# ── Task 6: Toughest subject ──────────────────────────────────────────────────
+toughest = avg_subject.idxmin()
+print(f"\nTASK 6 — Toughest subject (lowest avg): {toughest} "
+      f"({avg_subject.min():.2f})")
+
+# ── Task 7: Top 5 students ────────────────────────────────────────────────────
+print("\nTASK 7 — Top 5 Students:")
+top5 = df.nlargest(5, 'Percentage')[['Name', 'Program', 'Percentage', 'Grade']]
+print(top5.to_string(index=False))
+
+# ── Task 8: Program comparison ────────────────────────────────────────────────
+print("\nTASK 8 — Program Performance Comparison:")
+prog_comp = df.groupby('Program')[SUBJECTS + ['Percentage']].mean().round(2)
+print(prog_comp.to_string())
+
+# ── Task 9: Academic Report ───────────────────────────────────────────────────
+best_prog = df.groupby('Program')['Percentage'].mean().idxmax()
+print(f"""
+{'='*60}
+ACADEMIC PERFORMANCE REPORT
+{'='*60}
+  Total Students     : {len(df)}
+  Overall Avg %      : {df['Percentage'].mean():.2f}%
+  Highest Scorer     : {df.loc[df['Percentage'].idxmax(), 'Name']} ({df['Percentage'].max():.2f}%)
+  Lowest Scorer      : {df.loc[df['Percentage'].idxmin(), 'Name']} ({df['Percentage'].min():.2f}%)
+  Best Program       : {best_prog}
+  Toughest Subject   : {toughest} (avg {avg_subject.min():.2f}/100)
+
+  Grade Distribution : {dict(df['Grade'].value_counts())}
+
+  Recommendations:
+  • Provide extra tutorials for {toughest} — students consistently score
+    lowest in this subject.
+  • {df.loc[df['Percentage'].idxmin(), 'Name']} needs academic intervention;
+    a mentorship programme would help.
+  • {best_prog} students outperform peers — consider using top students
+    as peer tutors to lift weaker programs.
+{'='*60}
+""")

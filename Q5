@@ -1,0 +1,166 @@
+class Person:
+    """Base class for all people in the university."""
+
+    def __init__(self, name, age, email):
+        self.name  = name
+        self.age   = age
+        self.email = email
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(name={self.name!r})"
+
+    def display(self):
+        print(f"  Name  : {self.name}")
+        print(f"  Age   : {self.age}")
+        print(f"  Email : {self.email}")
+
+
+class Course:
+    """Represents a university course."""
+
+    def __init__(self, course_code, title, credits, professor=None):
+        self.course_code = course_code
+        self.title       = title
+        self.credits     = credits
+        self.professor   = professor
+        self._enrolled_students = []   # list of (Student, grade_points)
+
+    def assign_professor(self, professor):
+        self.professor = professor
+
+    def enroll_student(self, student):
+        for s, _ in self._enrolled_students:
+            if s is student:
+                print(f"  {student.name} is already enrolled in {self.title}.")
+                return
+        self._enrolled_students.append([student, None])
+        print(f"  {student.name} enrolled in '{self.title}' ({self.course_code})")
+
+    def assign_grade(self, student, grade_points):
+        """grade_points on a 4.0 scale."""
+        for entry in self._enrolled_students:
+            if entry[0] is student:
+                entry[1] = grade_points
+                return
+        print(f"  {student.name} is not enrolled in {self.title}.")
+
+    def __repr__(self):
+        prof = self.professor.name if self.professor else "TBA"
+        return f"Course({self.course_code!r}, {self.title!r}, professor={prof!r})"
+
+
+class Student(Person):
+    """Represents a university student."""
+
+    GRADE_SCALE = {
+        "A+": 4.0, "A": 4.0, "A-": 3.7,
+        "B+": 3.3, "B": 3.0, "B-": 2.7,
+        "C+": 2.3, "C": 2.0, "C-": 1.7,
+        "D":  1.0, "F": 0.0,
+    }
+
+    def __init__(self, student_id, name, age, email, program):
+        super().__init__(name, age, email)
+        self.student_id = student_id
+        self.program    = program
+        self._courses   = []    # list of Course objects
+
+    def enroll(self, course):
+        if course not in self._courses:
+            self._courses.append(course)
+            course.enroll_student(self)
+        else:
+            print(f"  Already enrolled in {course.title}.")
+
+    def calculate_gpa(self):
+        """Weighted GPA based on course credits."""
+        total_points  = 0.0
+        total_credits = 0
+        for course in self._courses:
+            for student, grade in course._enrolled_students:
+                if student is self and grade is not None:
+                    total_points  += grade * course.credits
+                    total_credits += course.credits
+        if total_credits == 0:
+            return 0.0
+        return round(total_points / total_credits, 2)
+
+    def display(self):
+        print(f"\n--- Student: {self.name} ---")
+        super().display()
+        print(f"  Student ID: {self.student_id}")
+        print(f"  Program   : {self.program}")
+        print(f"  Courses   : {[c.title for c in self._courses]}")
+        print(f"  GPA       : {self.calculate_gpa():.2f}")
+
+
+class Professor(Person):
+    """Represents a university professor."""
+
+    def __init__(self, professor_id, name, age, email, department):
+        super().__init__(name, age, email)
+        self.professor_id = professor_id
+        self.department   = department
+        self._courses     = []
+
+    def assign_to_course(self, course):
+        if course not in self._courses:
+            self._courses.append(course)
+            course.assign_professor(self)
+            print(f"  {self.name} assigned to '{course.title}'")
+
+    def display(self):
+        print(f"\n--- Professor: {self.name} ---")
+        super().display()
+        print(f"  Professor ID: {self.professor_id}")
+        print(f"  Department  : {self.department}")
+        print(f"  Courses     : {[c.title for c in self._courses]}")
+
+
+# ── Demo ──────────────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    # Create professors
+    prof1 = Professor("P001", "Dr. Smith",  50, "smith@uni.ca",  "Computer Science")
+    prof2 = Professor("P002", "Dr. Patel",  45, "patel@uni.ca",  "Mathematics")
+
+    # Create courses
+    c1 = Course("CS101", "Intro to Programming", credits=3)
+    c2 = Course("MATH201", "Calculus II",         credits=4)
+    c3 = Course("CS201", "Data Structures",       credits=3)
+
+    # Assign professors
+    print("=== Course Assignments ===")
+    prof1.assign_to_course(c1)
+    prof1.assign_to_course(c3)
+    prof2.assign_to_course(c2)
+
+    # Create students
+    s1 = Student("S1001", "Alice", 20, "alice@uni.ca", "Software Engineering")
+    s2 = Student("S1002", "Bob",   22, "bob@uni.ca",   "Data Science")
+    s3 = Student("S1003", "Carol", 21, "carol@uni.ca", "Software Engineering")
+
+    # Enroll students
+    print("\n=== Enrollments ===")
+    s1.enroll(c1); s1.enroll(c2); s1.enroll(c3)
+    s2.enroll(c1); s2.enroll(c2)
+    s3.enroll(c3)
+
+    # Assign grades (4.0 scale)
+    print("\n=== Grade Assignment ===")
+    c1.assign_grade(s1, 3.7)   # A-
+    c2.assign_grade(s1, 4.0)   # A
+    c3.assign_grade(s1, 3.3)   # B+
+    c1.assign_grade(s2, 3.0)   # B
+    c2.assign_grade(s2, 2.7)   # B-
+    c3.assign_grade(s3, 3.7)   # A-
+    print("  Grades assigned.")
+
+    # Display results
+    print("\n=== Student Reports ===")
+    s1.display()
+    s2.display()
+    s3.display()
+
+    print("\n=== Professor Reports ===")
+    prof1.display()
+    prof2.display()

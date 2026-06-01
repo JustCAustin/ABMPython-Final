@@ -1,0 +1,154 @@
+import re
+
+VALID_DEPARTMENTS = {"Engineering", "Finance", "HR", "Marketing", "Operations", "Sales"}
+
+
+# ── Descriptors ───────────────────────────────────────────────────────────────
+
+class EmployeeIDDescriptor:
+	"""Validates Employee ID format: EMP-XXXX (4 digits)."""
+
+	def __set_name__(self, owner, name):
+		self._name = name
+
+	def __get__(self, obj, objtype=None):
+		if obj is None:
+			return self
+		return obj.__dict__.get(self._name)
+
+	def __set__(self, obj, value):
+		if not isinstance(value, str):
+			raise TypeError(f"Employee ID must be a string, got {type(value).__name__}.")
+		pattern = r'^EMP-\d{4}$'
+		if not re.match(pattern, value):
+			raise ValueError(
+				f"Invalid Employee ID '{value}'. "
+				f"Must follow format 'EMP-XXXX' (e.g. EMP-1001)."
+			)
+		obj.__dict__[self._name] = value
+
+
+class SalaryDescriptor:
+	"""Validates that salary is a non-negative number."""
+
+	def __set_name__(self, owner, name):
+		self._name = name
+
+	def __get__(self, obj, objtype=None):
+		if obj is None:
+			return self
+		return obj.__dict__.get(self._name)
+
+	def __set__(self, obj, value):
+		if not isinstance(value, (int, float)):
+			raise TypeError(f"Salary must be a number, got {type(value).__name__}.")
+		if value < 0:
+			raise ValueError(f"Salary cannot be negative. Got {value}.")
+		obj.__dict__[self._name] = float(value)
+
+
+class DepartmentDescriptor:
+	"""Validates that department belongs to a predefined set."""
+
+	def __set_name__(self, owner, name):
+		self._name = name
+
+	def __get__(self, obj, objtype=None):
+		if obj is None:
+			return self
+		return obj.__dict__.get(self._name)
+
+	def __set__(self, obj, value):
+		if not isinstance(value, str):
+			raise TypeError(f"Department must be a string, got {type(value).__name__}.")
+		if value not in VALID_DEPARTMENTS:
+			raise ValueError(
+				f"Invalid department '{value}'. "
+				f"Valid departments: {sorted(VALID_DEPARTMENTS)}."
+			)
+		obj.__dict__[self._name] = value
+
+
+# ── Employee Class ─────────────────────────────────────────────────────────────
+
+class Employee:
+	employee_id = EmployeeIDDescriptor()
+	salary      = SalaryDescriptor()
+	department  = DepartmentDescriptor()
+
+	def __init__(self, name, employee_id, salary, department):
+		self.name        = name
+		self.employee_id = employee_id   # triggers EmployeeIDDescriptor
+		self.salary      = salary        # triggers SalaryDescriptor
+		self.department  = department    # triggers DepartmentDescriptor
+
+	def __repr__(self):
+		return (
+			f"Employee(name={self.name!r}, id={self.employee_id!r}, "
+			f"salary={self.salary:.2f}, dept={self.department!r})"
+		)
+
+	def display(self):
+		print(f"  Name       : {self.name}")
+		print(f"  ID         : {self.employee_id}")
+		print(f"  Department : {self.department}")
+		print(f"  Salary     : ${self.salary:,.2f}")
+
+
+# Subclass — descriptors still work without redefinition
+class Manager(Employee):
+	def __init__(self, name, employee_id, salary, department, team_size):
+		super().__init__(name, employee_id, salary, department)
+		self.team_size = team_size
+
+	def display(self):
+		super().display()
+		print(f"  Team Size  : {self.team_size}")
+
+
+# ── Demo ──────────────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+	print("=== Valid Employee ===")
+	emp = Employee("Alice", "EMP-1001", 75000, "Engineering")
+	emp.display()
+
+	print("\n=== Valid Manager ===")
+	mgr = Manager("Bob", "EMP-2002", 120000, "Finance", team_size=8)
+	mgr.display()
+
+	print("\n=== Validation Tests ===")
+
+	# Bad Employee ID
+	try:
+		Employee("Charlie", "EMP-ABC", 50000, "HR")
+	except ValueError as e:
+		print(f"Bad ID       : {e}")
+
+	# Negative salary
+	try:
+		Employee("Diana", "EMP-3003", -500, "Sales")
+	except ValueError as e:
+		print(f"Neg salary   : {e}")
+
+	# Invalid department
+	try:
+		Employee("Eve", "EMP-4004", 60000, "Magic")
+	except ValueError as e:
+		print(f"Bad dept     : {e}")
+
+	# Wrong type for salary
+	try:
+		Employee("Frank", "EMP-5005", "lots", "HR")
+	except TypeError as e:
+		print(f"Type error   : {e}")
+
+	# Update existing employee — descriptors still validate
+	print("\n=== Updating existing employee ===")
+	try:
+		emp.salary = -100
+	except ValueError as e:
+		print(f"Update error : {e}")
+
+	emp.salary = 80000
+	print(f"New salary   : ${emp.salary:,.2f}")
+

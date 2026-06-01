@@ -1,0 +1,124 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')
+import io, os
+
+CSV_DATA = """BookingID,GuestName,City,RoomType,Nights,RatePerNight,BookingDate,Status
+B001,John Smith,Calgary,Standard,3,120,2025-01-05,Completed
+B002,Sarah Lee,Edmonton,Deluxe,5,180,2025-01-07,Completed
+B003,Mike Brown,Red Deer,Suite,2,300,2025-01-10,Cancelled
+B004,Emma Davis,Calgary,Standard,4,120,2025-01-12,Completed
+B005,Chris Wilson,Lethbridge,Deluxe,6,180,2025-01-15,Completed
+B006,Lisa Taylor,Medicine Hat,Suite,3,300,2025-01-18,Completed
+B007,Kevin White,Calgary,Standard,2,120,2025-01-20,Cancelled
+B008,Nancy Hall,Edmonton,Suite,5,300,2025-01-22,Completed
+B009,Tom Clark,Red Deer,Deluxe,4,180,2025-01-25,Completed
+B010,Susan Green,Calgary,Suite,3,300,2025-01-28,Completed"""
+
+OUTPUT = "/mnt/user-data/outputs"
+os.makedirs(OUTPUT, exist_ok=True)
+
+df = pd.read_csv(io.StringIO(CSV_DATA))
+df['BookingDate'] = pd.to_datetime(df['BookingDate'])
+
+print("=" * 60)
+print("TASK 1: Load dataset")
+print("=" * 60)
+print(df.to_string(index=False))
+
+# Task 2 — TotalCost column
+df['TotalCost'] = df['Nights'] * df['RatePerNight']
+print("\n" + "=" * 60)
+print("TASK 2: TotalCost column")
+print("=" * 60)
+print(df[['BookingID', 'GuestName', 'RoomType', 'Nights', 'RatePerNight', 'TotalCost']].to_string(index=False))
+
+# Task 3 — Total revenue from Completed
+completed        = df[df['Status'] == 'Completed']
+total_revenue    = completed['TotalCost'].sum()
+print(f"\nTASK 3 — Total revenue (Completed bookings): ${total_revenue:,.2f}")
+
+# Task 4 — Most popular room type
+popular_room = df.groupby('RoomType')['BookingID'].count().idxmax()
+print(f"\nTASK 4 — Most popular room type: {popular_room}")
+
+# Task 5 — City with highest number of guests
+top_city = df.groupby('City')['BookingID'].count().idxmax()
+print(f"\nTASK 5 — City with highest guests: {top_city} "
+      f"({df.groupby('City')['BookingID'].count().max()} bookings)")
+
+# Task 6 — Average booking value
+avg_value = df['TotalCost'].mean()
+print(f"\nTASK 6 — Average booking value: ${avg_value:,.2f}")
+
+# Task 7 — Charts
+print("\nTASK 7 — Generating charts...")
+
+fig, axes = plt.subplots(1, 3, figsize=(16, 5))
+fig.suptitle("Hotel Booking Analysis Dashboard", fontsize=14, fontweight='bold')
+
+# Bar chart — Revenue by Room Type
+room_rev = completed.groupby('RoomType')['TotalCost'].sum()
+room_rev.plot(kind='bar', ax=axes[0], color=['steelblue','coral','mediumseagreen'], edgecolor='black')
+axes[0].set_title("Revenue by Room Type (Completed)")
+axes[0].set_xlabel("Room Type")
+axes[0].set_ylabel("Revenue ($)")
+axes[0].tick_params(axis='x', rotation=0)
+for p in axes[0].patches:
+    axes[0].annotate(f"${p.get_height():,.0f}", (p.get_x()+p.get_width()/2, p.get_height()),
+                     ha='center', va='bottom', fontsize=9)
+
+# Pie chart — Booking Status
+status_count = df['Status'].value_counts()
+axes[1].pie(status_count, labels=status_count.index, autopct='%1.1f%%',
+            startangle=90, colors=['mediumseagreen', 'tomato'])
+axes[1].set_title("Booking Status")
+
+# Histogram — Booking Values
+axes[2].hist(df['TotalCost'], bins=6, color='cornflowerblue', edgecolor='black')
+axes[2].set_title("Distribution of Booking Values")
+axes[2].set_xlabel("Total Cost ($)")
+axes[2].set_ylabel("Frequency")
+
+plt.tight_layout()
+plt.savefig(f"{OUTPUT}/q16_hotel_dashboard.png", dpi=100)
+plt.close()
+print("  → Saved: q16_hotel_dashboard.png")
+
+# Task 8 — Top 3 highest-value bookings
+print("\nTASK 8 — Top 3 highest-value bookings:")
+top3 = df.nlargest(3, 'TotalCost')[['BookingID', 'GuestName', 'RoomType', 'Nights', 'TotalCost']]
+print(top3.to_string(index=False))
+
+# Task 9 — Cancellation percentage
+cancel_pct = (df['Status'] == 'Cancelled').mean() * 100
+print(f"\nTASK 9 — Cancellation rate: {cancel_pct:.1f}%")
+
+# Task 10 — Business insights
+print("\n" + "=" * 60)
+print("TASK 10: BUSINESS INSIGHTS")
+print("=" * 60)
+print(f"""
+  1. SUITE ROOMS GENERATE HIGHEST REVENUE: Despite having fewer bookings,
+     Suite rooms bring in the most revenue due to their high nightly rate
+     of $300. Investing in more suite inventory could significantly boost
+     income.
+
+  2. CALGARY IS THE BUSIEST CITY: Calgary has the most bookings (4),
+     making it the primary market. Targeted marketing campaigns here
+     would yield the highest return.
+
+  3. CANCELLATION RATE IS {cancel_pct:.0f}%: Two out of ten bookings were
+     cancelled. Implementing a flexible cancellation policy with small
+     deposits could reduce last-minute cancellations.
+
+  4. AVERAGE BOOKING VALUE IS ${avg_value:,.0f}: This is a healthy average.
+     Upselling guests on room upgrades or add-on packages (spa, breakfast)
+     could push this higher.
+
+  5. DELUXE ROOMS ARE POPULAR AND CONSISTENT: Deluxe rooms appear across
+     multiple cities and statuses, indicating strong broad demand.
+     Maintaining competitive pricing for Deluxe rooms sustains occupancy.
+""")
